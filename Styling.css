@@ -1,0 +1,162 @@
+td {
+  padding: 0;
+}
+span[id="time"] {
+  font-size: 300%;
+  position: absolute;
+  text-align: center;
+  top: 0px;
+  width: 100%;
+}
+[id="algassist"] {
+  width: 75%;
+  display: absolute;
+  bottom: 0px;
+  text-align: center;
+  font-size: 200%;
+}
+div[class="options"] {
+  width: 50%;
+}
+table[class="options"] {
+  width: 50%;
+  border: none;
+  display: fixed;
+}
+td[class="options"] {
+  background-color: black;
+  color: white;
+  text-align: left;
+  vertical-align: top;
+}
+div[id="selectTable"] {
+  position: fixed;
+  height: 100vh;
+  right: 0px;
+  top: 0px;
+  overflow-x: hidden;
+  overflow-y: scroll;
+}
+div[class="container"] {
+  position: relative;
+}
+div[id="timer"] {
+  position: absolute;
+  height: 100%;
+  width: 75%;
+}
+
+tr {
+  vertical-align: top;
+  background-color: white;
+  color: black;
+}
+select[id="algset"] {
+  width: 75%;
+}
+th {
+  background-color: white;
+}
+
+table {
+  border: 1px solid white;
+  background-color: black;
+  table-layout: fixed;
+}
+
+.no {
+  display: none;
+}
+
+div {
+  border-style: solid;
+  border-width: 0px;
+}
+
+#cube {
+  width: 75%;
+  text-align: center;
+}
+
+canvas[id="c"] {
+  display: inline;
+  padding: 100px;
+}
+
+input[type="checkbox"] {
+  display: none;
+}
+
+td[id="case-name"] {
+  text-align: middle;
+  vertical-align: middle;
+  font-size: x-large;
+  font-weight: Bold;
+  color: black;
+}
+
+[class="larger text"] {
+  text-align: center;
+  vertical-align: middle;
+  font-size: large;
+  font-weight: Bold;
+  color: black;
+}
+
+label[id="case-name-label"] {
+  padding-bottom: 110%;
+  padding-top: 110%;
+}
+
+label {
+  padding: 4px;
+  display: block;
+  position: relative;
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+label[id="algs"]::before {
+  background-color: white;
+  color: white;
+  content: "";
+  display: block;
+  border-radius: 50%;
+  border: 1px solid grey;
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 25px;
+  height: 25px;
+  text-align: center;
+  line-height: 28px;
+  transition-duration: 0.3s;
+  transform: scale(0);
+}
+
+label[id="algs"] img {
+  height: 90x;
+  width: 90px;
+  transition-duration: 0.2s;
+  transform-origin: 50% 50%;
+}
+
+:checked + label[id="algs"] {
+  border-color: #ddd;
+}
+
+:checked + label[id="algs"]::before {
+  content: "✓";
+  background-color: grey;
+  transform: scale(1);
+}
+:checked + label[id="algs"] img {
+  transform: scale(0.9);
+  box-shadow: 0 0 5px #333;
+  z-index: -1;
+}

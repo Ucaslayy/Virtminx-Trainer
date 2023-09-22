@@ -1,0 +1,6071 @@
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <link rel="stylesheet" type="text/css" href="Styling.css" media="screen" />
+    <script type="text/javascript" src="pllalgs.js"></script>
+    <script type="text/javascript" src="pllscramblemap.js"></script>
+    <script type="text/javascript" src="ollalgs.js"></script>
+    <script type="text/javascript" src="ollscramblemap.js"></script>
+    <script type="text/javascript">
+      // options from the menu
+      let colorScheme = "mf8",
+        puzzle = "megaminx",
+        pEvent = "single";
+      const solveCheck = true;
+      let colors = [
+        "#888888", //white
+        "#FF92BB", //pink
+        "#00ff00", //light green
+        "#FFFF66", //beige
+        "#FF8600", //orange
+        "#70DBDB", //light blue
+        "#0000ff", //dark blue
+        "#ff0000", //red
+        "#ffff00", //yellow
+        "#00bb00", //green
+        "#5C246E", //purple
+        "#ffffff", //white
+        "black",
+        "white",
+      ];
+
+      let chosenAlgsPLL = [];
+      let chosenAlgsOLL = [];
+      let randomcase;
+
+      let algType = "pll";
+
+      const s = 1; // size of cube
+      let r1 = 1,
+        r2 = 2,
+        l1 = 1,
+        l2 = 3; // handshifting
+      let cwidth = 600,
+        cheight = 600; // size of canvas
+
+      const stickers = [];
+      let c;
+      let corners = [],
+        edges = [],
+        centers = [],
+        view = [];
+
+      // minx stuff
+      const FACE_U = 0,
+        FACE_F = 1,
+        FACE_LU = 2,
+        FACE_RU = 3,
+        FACE_LB = 4,
+        FACE_RB = 5,
+        FACE_LF = 6,
+        FACE_RF = 7,
+        FACE_LD = 8,
+        FACE_RD = 9,
+        FACE_B = 10,
+        FACE_D = 11;
+      let adj = [
+        [1, 2, 4, 5, 3],
+        [0, 3, 7, 6, 2],
+        [0, 1, 6, 8, 4],
+        [1, 0, 5, 9, 7],
+        [0, 2, 8, 10, 5],
+        [0, 4, 10, 9, 3],
+        [1, 7, 11, 8, 2],
+        [1, 3, 9, 11, 6],
+        [6, 11, 10, 4, 2],
+        [7, 3, 5, 10, 11],
+        [5, 4, 8, 11, 9],
+        [6, 7, 9, 10, 8],
+      ];
+
+      let times = [];
+      const avgLengths = [5, 12, 100];
+      let bestAverages = [[], [], []]; // best of 5, 12, 100
+      let startTime;
+      let curTime;
+      let timerID;
+      let inspectionID;
+
+      let started = false;
+      let solving = false;
+
+      const browser = getBrowser(); // only want to call this once
+
+      window.onkeydown = function (event) {
+        doKey(event);
+      };
+
+      /**********************
+       * CONTROL & GRAPHICS *
+       **********************/
+
+      function init() {
+        clearInterval(inspectionID); // just in case
+        document.bgColor = colors[12];
+        document.fgColor = colors[13];
+
+        c = $("c").getContext("2d");
+        $("c").height = cheight;
+        $("c").width = cwidth;
+        $("cube").height = cheight;
+        $("cube").width = cwidth;
+
+        setToSolved();
+
+        draw();
+      }
+
+      function setToSolved() {
+        for (let i = 0; i < 12; i++) {
+          view[i] = i;
+        }
+        for (let i = 0; i < 12; i++) {
+          corners[i] = [];
+          edges[i] = [];
+          for (let j = 0; j < 5; j++) {
+            corners[i][j] = [];
+            edges[i][j] = [];
+            for (let k = 0; k < s; k++) {
+              corners[i][j][k] = [];
+              edges[i][j][k] = i;
+              for (let l = 0; l < s; l++) {
+                corners[i][j][k][l] = i;
+              }
+            }
+          }
+        }
+      }
+
+      function draw() {
+        let center, length;
+        let p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15;
+
+        center = [cwidth / 2, cheight / 2];
+        length = Math.min(cwidth, cheight) * 0.3;
+
+        p1 = add(center, [0, length]);
+        p2 = add(center, [-0.95106 * length, 0.30902 * length]);
+        p3 = add(center, [-0.58779 * length, -0.80902 * length]);
+        p4 = add(center, [0.58779 * length, -0.80902 * length]);
+        p5 = add(center, [0.95106 * length, 0.30902 * length]);
+        p6 = add(center, [0, 1.61803 * length]);
+        p7 = add(center, [0.95106 * length, 1.30902 * length]);
+        p8 = add(center, [1.53884 * length, 0.5 * length]);
+        p9 = add(center, [1.53884 * length, -0.5 * length]);
+        p10 = add(center, [0.95106 * length, -1.30902 * length]);
+        p11 = add(center, [0, -1.61803 * length]);
+        p12 = add(center, [-0.95106 * length, -1.30902 * length]);
+        p13 = add(center, [-1.53884 * length, -0.5 * length]);
+        p14 = add(center, [-1.53884 * length, 0.5 * length]);
+        p15 = add(center, [-0.95106 * length, 1.30902 * length]);
+
+        drawFace(
+          p1,
+          p5,
+          p4,
+          p3,
+          p2,
+          FACE_F,
+          FACE_RF,
+          FACE_RU,
+          FACE_U,
+          FACE_LU,
+          FACE_LF
+        );
+        drawFace(
+          p1,
+          p6,
+          p7,
+          p8,
+          p5,
+          FACE_RF,
+          FACE_LF,
+          FACE_D,
+          FACE_RD,
+          FACE_RU,
+          FACE_F
+        );
+        drawFace(
+          p5,
+          p8,
+          p9,
+          p10,
+          p4,
+          FACE_RU,
+          FACE_RF,
+          FACE_RD,
+          FACE_RB,
+          FACE_U,
+          FACE_F
+        );
+        drawFace(
+          p4,
+          p10,
+          p11,
+          p12,
+          p3,
+          FACE_U,
+          FACE_RU,
+          FACE_RB,
+          FACE_LB,
+          FACE_LU,
+          FACE_F
+        );
+        drawFace(
+          p3,
+          p12,
+          p13,
+          p14,
+          p2,
+          FACE_LU,
+          FACE_U,
+          FACE_LB,
+          FACE_LD,
+          FACE_LF,
+          FACE_F
+        );
+        drawFace(
+          p2,
+          p14,
+          p15,
+          p6,
+          p1,
+          FACE_LF,
+          FACE_LU,
+          FACE_LD,
+          FACE_D,
+          FACE_RF,
+          FACE_F
+        );
+      }
+
+      function drawFace(v1, v2, v3, v4, v5, f0, f1, f2, f3, f4, f5) {
+        let p = [v1, v2, v3, v4, v5];
+        let f = [view[f1], view[f2], view[f3], view[f4], view[f5]];
+        let e = view[f0];
+
+        // define the ten vectors
+        let v = [];
+        for (let i = 0; i < 5; i++) {
+          v[i * 2] = mul(sub(p[(i + 1) % 5], p[i]), 1 / (2 * s + 1));
+          v[i * 2 + 1] = mul(sub(p[(i + 4) % 5], p[i]), 1 / (2 * s + 1));
+        }
+
+        for (let i = 0; i < 5; i++) {
+          let x0 = v[i * 2],
+            x1 = v[i * 2 + 1];
+          let y0 = v[((i + 4) % 5) * 2],
+            y1 = v[((i + 4) % 5) * 2 + 1];
+          // draw the corners
+          for (let j = 0; j < s; j++) {
+            for (let k = 0; k < s; k++) {
+              let base = add(p[i], mul(x0, j), mul(x1, k));
+              drawPoly4(
+                base,
+                add(base, x0),
+                add(base, x0, x1),
+                add(base, x1),
+                colors[corners[e][getIndex(e, f[i % 5])][j][k]]
+              );
+            }
+          }
+          // draw the edges
+          for (let j = 0; j < s; j++) {
+            let base1 = add(p[i], mul(x1, s), mul(x0, j));
+            let base2 = add(p[(i + 4) % 5], mul(y0, s), mul(y1, j));
+            drawPoly4(
+              base1,
+              add(base1, x0),
+              add(base2, y1),
+              base2,
+              colors[edges[e][getIndex(e, f[(i + 4) % 5])][j]]
+            );
+          }
+        }
+        // draw the center
+        drawPoly5(
+          add(p[0], mul(v[0], s), mul(v[1], s)),
+          add(p[1], mul(v[2], s), mul(v[3], s)),
+          add(p[2], mul(v[4], s), mul(v[5], s)),
+          add(p[3], mul(v[6], s), mul(v[7], s)),
+          add(p[4], mul(v[8], s), mul(v[9], s)),
+          colors[e]
+        );
+      }
+
+      function drawPoly3(v1, v2, v3, color) {
+        c.strokeStyle = "#000";
+        c.fillStyle = color;
+        c.beginPath();
+        c.moveTo(v1[0], v1[1]);
+        c.lineTo(v2[0], v2[1]);
+        c.lineTo(v3[0], v3[1]);
+        c.lineTo(v1[0], v1[1]);
+        c.closePath();
+        c.fill();
+        c.stroke();
+      }
+
+      function drawPoly4(v1, v2, v3, v4, color) {
+        c.strokeStyle = "#000";
+        c.fillStyle = color;
+        c.beginPath();
+        c.moveTo(v1[0], v1[1]);
+        c.lineTo(v2[0], v2[1]);
+        c.lineTo(v3[0], v3[1]);
+        c.lineTo(v4[0], v4[1]);
+        c.lineTo(v1[0], v1[1]);
+        c.closePath();
+        c.fill();
+        c.stroke();
+      }
+
+      function drawPoly5(v1, v2, v3, v4, v5, color) {
+        c.strokeStyle = "#000";
+        c.fillStyle = color;
+        c.beginPath();
+        c.moveTo(v1[0], v1[1]);
+        c.lineTo(v2[0], v2[1]);
+        c.lineTo(v3[0], v3[1]);
+        c.lineTo(v4[0], v4[1]);
+        c.lineTo(v5[0], v5[1]);
+        c.lineTo(v1[0], v1[1]);
+        c.closePath();
+        c.fill();
+        c.stroke();
+      }
+
+      function getIndex(face, other) {
+        for (let i = 0; i < 5; i++) if (adj[face][i] == other) return i;
+        return -1;
+      }
+
+      function move(face, amount, layer, redraw) {
+        if (layer > s) layer = s;
+        for (let i = 0; i < layer; i++) {
+          movelet(view[face], amount, i);
+        }
+
+        if (redraw) draw();
+        if (redraw && solving) {
+          startTimer();
+        }
+      }
+
+      function doKey(e) {
+        let keyCode = 0;
+        if (e.keyCode) {
+          keyCode = e.keyCode;
+        } else if (e.which) {
+          keyCode = e.which;
+        }
+        const shift = e.shiftKey;
+        let shmod = shift ? 1 : 0; // shift modifier for layers
+        if (keyCode == 32 || keyCode == 9) {
+          // prevent normal handling of space and tab key
+          if (e.stopPropagation) {
+            e.stopPropagation();
+          }
+          e.preventDefault();
+        }
+
+        // space to scramble
+        if (keyCode == 32) {
+          l1 = 1;
+          l2 = 2;
+          r1 = 1;
+          r2 = 2;
+
+          if (solving) {
+            if (isSolved()) {
+              finishSolve();
+            }
+          } else {
+            if (
+              (chosenAlgsPLL.length !== 0 && algType === "pll") ||
+              (chosenAlgsOLL.length !== 0 && algType === "oll")
+            ) {
+              nCurrent = 0;
+              scramble();
+              inspectionID = setTimeout(startTimer, 15000);
+              started = false;
+              solving = true;
+            }
+          }
+        } else if (keyCode == 13) {
+          if (solving) assistance();
+        }
+        //i k = R R'
+        else if (keyCode == 73) {
+          move(FACE_RU, 1, 1, r1 + shmod, true);
+        } else if (keyCode == 75) {
+          move(FACE_RU, 4, 1, r1 + shmod, true);
+        }
+        //j f = U U'
+        else if (keyCode == 74) {
+          move(FACE_U, 1, 1, 1 + shmod, true);
+        } else if (keyCode == 70) {
+          move(FACE_U, 4, 1, 1 + shmod, true);
+        }
+        //d e = L L'
+        else if (keyCode == 68) {
+          move(FACE_LU, 1, 1, l1 + shmod, true);
+        } else if (keyCode == 69) {
+          move(FACE_LU, 4, 1, l1 + shmod, true);
+        }
+        //u m = r r'
+        else if (keyCode == 85) {
+          move(FACE_RU, 1, 1, r2 + shmod, true);
+        } else if (keyCode == 77) {
+          move(FACE_RU, 4, 1, r2 + shmod, true);
+        }
+        //v r = l l'
+        else if (keyCode == 86) {
+          move(FACE_LU, 1, 1, l2 + shmod, true);
+        } else if (keyCode == 82) {
+          move(FACE_LU, 4, 1, l2 + shmod, true);
+        }
+        //h g = F F'
+        else if (keyCode == 72) {
+          move(FACE_F, 1, 1, 1 + shmod, true);
+        } else if (keyCode == 71) {
+          move(FACE_F, 4, 1, 1 + shmod, true);
+        }
+        //s l = D D'
+        else if (keyCode == 83) {
+          move(FACE_RF, 1, 1, 1 + shmod, true);
+        } else if (keyCode == 76) {
+          move(FACE_RF, 4, 1, 1 + shmod, true);
+        }
+        //c , = LD LD'
+        else if (keyCode == 67) {
+          move(FACE_LF, 1, 1, 1 + shmod, true);
+        } else if (keyCode == 188) {
+          move(FACE_LF, 4, 1, 1 + shmod, true);
+        }
+        //; a = [U] [U]'
+        else if (
+          keyCode == 59 ||
+          ((browser == "Chrome" || browser == "IE") && keyCode == 186)
+        )
+          rotate(FACE_U, 1);
+        else if (keyCode == 65) rotate(FACE_U, 4);
+        //w o = B B'
+        else if (keyCode == 87) {
+          move(FACE_RB, 1, 1, 1 + shmod, true);
+        } else if (keyCode == 79) {
+          move(FACE_RB, 4, 1, 1 + shmod, true);
+        }
+        //y n = [R] [R]'
+        else if (keyCode == 89) rotate(FACE_RU, 1);
+        else if (keyCode == 78) rotate(FACE_RU, 4);
+        //t b = [L]' [L]
+        else if (keyCode == 84) rotate(FACE_LU, 4);
+        else if (keyCode == 66) rotate(FACE_LU, 1);
+        //p q = [F] [F]'
+        else if (keyCode == 80) rotate(FACE_F, 1);
+        else if (keyCode == 81) rotate(FACE_F, 4);
+        //+ - for cube size
+        else if (
+          !shift &&
+          (keyCode == 107 ||
+            keyCode == 61 ||
+            ((browser == "Chrome" || browser == "IE") && keyCode == 187))
+        )
+          changeS(s + 1);
+        else if (
+          !shift &&
+          s > 1 &&
+          (keyCode == 109 ||
+            keyCode == 173 ||
+            ((browser == "Chrome" || browser == "IE") && keyCode == 189))
+        )
+          changeS(s - 1);
+        //shift + - for square size
+        else if (
+          shift &&
+          (keyCode == 107 ||
+            keyCode == 61 ||
+            ((browser == "Chrome" || browser == "IE") && keyCode == 187))
+        )
+          changeDimensions(cwidth + 20, cheight + 20);
+        else if (
+          shift &&
+          (keyCode == 109 ||
+            keyCode == 173 ||
+            ((browser == "Chrome" || browser == "IE") && keyCode == 189))
+        )
+          changeDimensions(cwidth - 20, cheight - 20);
+        //7 8 for Rin Rout
+        else if (keyCode == 55) {
+          r2++;
+          if (!shift) r1++;
+        } else if (keyCode == 56) {
+          if (shift && r2 - r1 > 1) r2--;
+          if (!shift && r1 > 1) {
+            r2--;
+            r1--;
+          }
+        }
+
+        //4 3 for Lin Lout
+        else if (keyCode == 52) {
+          l2++;
+          if (!shift) l1++;
+        } else if (keyCode == 51) {
+          if (shift && l2 - l1 > 1) l2--;
+          if (!shift && l1 > 1) {
+            l2--;
+            l1--;
+          }
+        }
+
+        //escape to reset
+        else if (keyCode == 27) {
+          if (solving) {
+            const agree = confirm("Are you SURE? This will stop the timer!");
+            if (!agree) return;
+          }
+          reset();
+        }
+      }
+
+      function finishSolve() {
+        stopTimer(true);
+        started = false;
+        solving = false;
+      }
+
+      function reset() {
+        nCurrent = 0;
+        stopTimer(false);
+        solving = false;
+        started = false;
+        init();
+      }
+
+      function changedColor() {
+        const obj = $("colors");
+        colorScheme = obj.options[obj.selectedIndex].value;
+
+        // if you're reading this, feel free to make a custom color scheme!
+        // first 12: side colors; 13: bg color; 14: text color
+        colors = [
+          "#7a7a7a", //white
+          "#FF92BB", //pink
+          "#00ff00", //light green
+          "#FFFF66", //beige
+          "#FF8600", //orange
+          "#70DBDB", //light blue
+          "#0000ff", //dark blue
+          "#ff0000", //red
+          "#ffff00", //yellow
+          "#00bb00", //green
+          "#5C246E", //white
+          "#ffffff", //purple
+          "black",
+          "white",
+        ]; // mf8
+        if (colorScheme == "blacktop") {
+          colors = [
+            "#101010",
+            "#FF92BB",
+            "#00ff00",
+            "#FFFF66",
+            "#FF8600",
+            "#70DBDB",
+            "#0000ff",
+            "#ff0000",
+            "#ffff00",
+            "#00bb00",
+            "#5C246E",
+            "#ffffff",
+            "black",
+            "white",
+          ];
+        }
+        draw();
+        document.bgColor = colors[12];
+        document.fgColor = colors[13];
+      }
+
+      function changeS(newS) {
+        if (solving) {
+          const agree = confirm("Are you SURE? This will stop the timer!");
+          if (!agree) return;
+        }
+        if (newS < 1) newS = 1;
+        if (newS == s) return;
+
+        stopTimer(false);
+        solving = false;
+        s = newS;
+
+        init();
+      }
+
+      function changeDimensions(newWidth, newHeight) {
+        cwidth = newWidth;
+        cheight = newHeight;
+        c = $("c").getContext("2d");
+        $("c").height = cheight;
+        $("c").width = cwidth;
+        $("cube").height = cheight;
+        $("cube").width = cwidth;
+        draw();
+      }
+
+      /******************
+       * PUZZLE DETAILS *
+       ******************/
+
+      function move(face, amount, layermin, layermax, update) {
+        if (layermax > s) layermax = s;
+        if (layermin < 1) layermin = 1;
+        let rotation = layermin == 1 && layermax == s;
+        for (let i = layermin - 1; i < layermax; i++) {
+          movelet(view[face], amount, i);
+        }
+
+        if (update) draw();
+        if (update && solving) {
+          startTimer();
+          if (solveCheck) {
+            if (isSolved()) {
+              finishSolve();
+            }
+          }
+        }
+      }
+
+      function rotate(face, amount) {
+        for (let i = 0; i < 5 - amount; i++) {
+          let temp = view[adj[face][0]];
+          view[adj[face][0]] = view[adj[face][1]];
+          view[adj[face][1]] = view[adj[face][2]];
+          view[adj[face][2]] = view[adj[face][3]];
+          view[adj[face][3]] = view[adj[face][4]];
+          view[adj[face][4]] = temp;
+          temp = view[11 - adj[face][0]];
+          view[11 - adj[face][0]] = view[11 - adj[face][1]];
+          view[11 - adj[face][1]] = view[11 - adj[face][2]];
+          view[11 - adj[face][2]] = view[11 - adj[face][3]];
+          view[11 - adj[face][3]] = view[11 - adj[face][4]];
+          view[11 - adj[face][4]] = temp;
+        }
+        draw();
+      }
+
+      function movelet(face, amount, layer) {
+        // arrays for various swaps
+        let facearr = [face, face, face, face, face];
+        let adjarr = [];
+        for (i = 0; i < 5; i++) {
+          adjarr.push([
+            adj[face][i],
+            adj[face][(i + 1) % 5],
+            adj[face][(i + 2) % 5],
+            adj[face][(i + 3) % 5],
+            adj[face][(i + 4) % 5],
+          ]);
+        }
+
+        // swap stickers
+        edgeSwap(amount, adjarr[0], facearr, layer);
+        for (let j = 0; j < s; j++) {
+          cornerSwap(amount, adjarr[0], facearr, j, layer);
+          cornerSwap(amount, adjarr[0], adjarr[1], layer, j);
+        }
+
+        // turn face
+        if (layer == 0) {
+          for (let i = 0; i < s; i++) {
+            edgeSwap(amount, facearr, adjarr[0], i);
+            for (let j = 0; j < s; j++) {
+              cornerSwap(amount, facearr, adjarr[0], i, j);
+            }
+          }
+        }
+      }
+
+      function cornerSwap(amount, f1, f2, x, y) {
+        for (let i = 0; i < amount; i++) {
+          let temp = corners[f1[0]][getIndex(f1[0], f2[0])][x][y];
+          corners[f1[0]][getIndex(f1[0], f2[0])][x][y] =
+            corners[f1[4]][getIndex(f1[4], f2[4])][x][y];
+          corners[f1[4]][getIndex(f1[4], f2[4])][x][y] =
+            corners[f1[3]][getIndex(f1[3], f2[3])][x][y];
+          corners[f1[3]][getIndex(f1[3], f2[3])][x][y] =
+            corners[f1[2]][getIndex(f1[2], f2[2])][x][y];
+          corners[f1[2]][getIndex(f1[2], f2[2])][x][y] =
+            corners[f1[1]][getIndex(f1[1], f2[1])][x][y];
+          corners[f1[1]][getIndex(f1[1], f2[1])][x][y] = temp;
+        }
+      }
+
+      function edgeSwap(amount, f1, f2, x) {
+        for (let i = 0; i < amount; i++) {
+          let temp = edges[f1[0]][getIndex(f1[0], f2[0])][x];
+          edges[f1[0]][getIndex(f1[0], f2[0])][x] =
+            edges[f1[4]][getIndex(f1[4], f2[4])][x];
+          edges[f1[4]][getIndex(f1[4], f2[4])][x] =
+            edges[f1[3]][getIndex(f1[3], f2[3])][x];
+          edges[f1[3]][getIndex(f1[3], f2[3])][x] =
+            edges[f1[2]][getIndex(f1[2], f2[2])][x];
+          edges[f1[2]][getIndex(f1[2], f2[2])][x] =
+            edges[f1[1]][getIndex(f1[1], f2[1])][x];
+          edges[f1[1]][getIndex(f1[1], f2[1])][x] = temp;
+        }
+      }
+
+      function centerSwap(amount, f1) {
+        for (let i = 0; i < amount; i++) {
+          let temp = centers[f1[0]];
+          centers[f1[0]] = centers[f1[4]];
+          centers[f1[4]] = centers[f1[3]];
+          centers[f1[3]] = centers[f1[2]];
+          centers[f1[2]] = centers[f1[1]];
+          centers[f1[1]] = temp;
+        }
+      }
+
+      function ultCornerSwap(amount, f1, f2, x) {
+        for (let i = 0; i < amount; i++) {
+          let temp = corners[f1[0]][getIndex(f1[0], f2[0])][x];
+          corners[f1[0]][getIndex(f1[0], f2[0])][x] =
+            corners[f1[4]][getIndex(f1[4], f2[4])][x];
+          corners[f1[4]][getIndex(f1[4], f2[4])][x] =
+            corners[f1[3]][getIndex(f1[3], f2[3])][x];
+          corners[f1[3]][getIndex(f1[3], f2[3])][x] =
+            corners[f1[2]][getIndex(f1[2], f2[2])][x];
+          corners[f1[2]][getIndex(f1[2], f2[2])][x] =
+            corners[f1[1]][getIndex(f1[1], f2[1])][x];
+          corners[f1[1]][getIndex(f1[1], f2[1])][x] = temp;
+        }
+      }
+
+      function ultEdgeSwap(amount, f1, f2, x, y) {
+        for (let i = 0; i < amount; i++) {
+          let temp = edges[f1[0]][getIndex(f1[0], f2[0])][x][y];
+          edges[f1[0]][getIndex(f1[0], f2[0])][x][y] =
+            edges[f1[4]][getIndex(f1[4], f2[4])][x][y];
+          edges[f1[4]][getIndex(f1[4], f2[4])][x][y] =
+            edges[f1[3]][getIndex(f1[3], f2[3])][x][y];
+          edges[f1[3]][getIndex(f1[3], f2[3])][x][y] =
+            edges[f1[2]][getIndex(f1[2], f2[2])][x][y];
+          edges[f1[2]][getIndex(f1[2], f2[2])][x][y] =
+            edges[f1[1]][getIndex(f1[1], f2[1])][x][y];
+          edges[f1[1]][getIndex(f1[1], f2[1])][x][y] = temp;
+        }
+      }
+
+      //1:pink, 2:light green, 3:beige, 4:orange, 5:light blue
+      function isSolved() {
+        let isBadColor = false;
+        if (algType === "pll") {
+          // Check if all stickers are the same on each face
+          for (let i = 0; i < 12; i++) {
+            //iterates through each center
+            for (let j = 0; j < 5; j++) {
+              //iterates through each corner and edge at the same time
+              if (corners[i][j][0][0] !== i) isBadColor = true;
+              if (edges[i][j][0] !== i) isBadColor = true;
+            }
+          }
+        } else if (algType === "oll") {
+          for (let i = 0; i < 12; i++) {
+            //iterates through each center
+            for (let j = 0; j < 5; j++) {
+              //iterates through each corner and edge at the same time
+
+              if (i === 1 || i === 2 || i === 4 || i === 5) {
+                if (j === 0 || j === 4) {
+                  continue;
+                }
+              } else if (i === 3) {
+                if (j === 0 || j === 1) {
+                  continue;
+                }
+              }
+              if (corners[i][j][0][0] !== i) isBadColor = true;
+              if (edges[i][j][0] !== i) isBadColor = true;
+            }
+          }
+        }
+        return !isBadColor;
+      }
+
+      function scramble() {
+        reset();
+        let algarray;
+        if (algType === "pll") {
+          randomcase =
+            chosenAlgsPLL[Math.floor(Math.random() * chosenAlgsPLL.length)]; // randomly selects one of the selected PLL cases
+          algarray =
+            pllMap[randomcase][Math.floor(Math.random() * 4)].split(" "); // splits moves & algs
+        } else if (algType === "oll") {
+          randomcase =
+            chosenAlgsOLL[Math.floor(Math.random() * chosenAlgsOLL.length)]; // randomly selects one of the selected OLL cases
+          algarray = ollMap[randomcase].split(" "); // splits moves & algs
+        }
+
+        for (let i = 0; i < algarray.length; i++) {
+          doMove(algarray[i]); // executes each move
+        }
+        $("algassist").innerHTML = "";
+        draw();
+      }
+
+      function doMove(m) {
+        switch (m) {
+          case "R":
+            move(FACE_RU, 1, 1, r1, true);
+            break;
+          case "R'":
+            move(FACE_RU, 4, 1, r1, true);
+            break;
+          case "U":
+            move(FACE_U, 1, 1, 1, true);
+            break;
+          case "U'":
+            move(FACE_U, 4, 1, 1, true);
+            break;
+          case "R2":
+            move(FACE_RU, 2, 1, r1, true);
+            break;
+          case "R2'":
+            move(FACE_RU, 3, 1, r1, true);
+            break;
+          case "U2":
+            move(FACE_U, 2, 1, 1, true);
+            break;
+          case "U2'":
+            move(FACE_U, 3, 1, 1, true);
+            break;
+          case "F":
+            move(FACE_F, 1, 1, 1, true);
+            break;
+          case "F'":
+            move(FACE_F, 4, 1, 1, true);
+            break;
+          case "F2":
+            move(FACE_F, 2, 1, 1, true);
+            break;
+          case "F2'":
+            move(FACE_F, 3, 1, 1, true);
+            break;
+        }
+      }
+
+      /*******************
+       * TIMER AND STATS *
+       *******************/
+
+      function startTimer() {
+        clearTimeout(inspectionID);
+        if (!started) {
+          started = true;
+          startTime = new Date();
+          timerID = setInterval(updateTimer, 100);
+        }
+      }
+
+      function pretty(time) {
+        time = Math.round(time);
+        let mins = Math.floor(time / 60000);
+        let secs = trim((time - 60000 * mins) / 1000, 3);
+        if (mins == 0) {
+          return secs;
+        } else {
+          return mins + (secs < 10 ? ":0" : ":") + secs;
+        }
+      }
+
+      function updateTimer() {
+        curTime = new Date();
+        let time = curTime.getTime() - startTime.getTime();
+        $("time").innerHTML = pretty(time);
+      }
+
+      function stopTimer(good) {
+        if (started) {
+          started = false;
+          curTime = new Date();
+          let time = curTime.getTime() - startTime.getTime();
+          $("time").innerHTML = pretty(time) + (good ? "" : "*");
+          clearInterval(timerID);
+
+          if (good) {
+            // store the time
+            times[times.length] = time;
+            // figure out averages and display
+            let v = "";
+
+            let min = 0;
+            for (let i = 1; i < times.length; i++) {
+              if (times[i] < times[min]) min = i;
+            }
+            v += "Best time: " + pretty(times[min]) + "<br>";
+
+            for (let i = 0; i < avgLengths.length; i++) {
+              const len = avgLengths[i];
+              if (times.length >= len) {
+                const avgData = getAvg(len, times.slice(times.length - len));
+                v += "Current avg" + len + ": " + avgData[0] + "<br>";
+                v += "Best avg" + len + ": ";
+                if (times.length == len || avgData[1] < bestAverages[i][1]) {
+                  bestAverages[i] = avgData;
+                }
+                v += bestAverages[i][0] + "<br>";
+              }
+            }
+          }
+        }
+      }
+
+      function getAvg(n, list) {
+        let max = 0;
+        let min = 0;
+        let sum = list[0];
+        for (let i = 1; i < n; i++) {
+          if (list[i] > list[max]) max = i;
+          if (list[i] < list[min]) min = i;
+          sum += list[i];
+        }
+        sum = sum - list[min] - list[max];
+        let v = "";
+        for (let i = 0; i < n; i++) {
+          if (i == min || i == max) {
+            v += "(" + pretty(list[i]) + ") ";
+          } else {
+            v += pretty(list[i]) + " ";
+          }
+        }
+        const avg = sum / (n - 2);
+        v += "=> " + pretty(avg);
+        return [v, avg];
+      }
+
+      /********************
+       * HELPER FUNCTIONS *
+       ********************/
+
+      function $(str) {
+        return document.getElementById(str);
+      }
+      function sqrt(x) {
+        return Math.sqrt(x);
+      }
+
+      // 2D vector arithmetic
+      function add(vec1, vec2, vec3) {
+        if (!vec3) {
+          return [vec1[0] + vec2[0], vec1[1] + vec2[1]];
+        } else {
+          return [vec1[0] + vec2[0] + vec3[0], vec1[1] + vec2[1] + vec3[1]];
+        }
+      }
+      function sub(vec1, vec2) {
+        return [vec1[0] - vec2[0], vec1[1] - vec2[1]];
+      }
+      function mul(vec, scal) {
+        return [vec[0] * scal, vec[1] * scal];
+      }
+
+      function trim(number, nDigits) {
+        if (
+          !number ||
+          number == Number.POSITIVE_INFINITY ||
+          number == Number.NEGATIVE_INFINITY
+        )
+          number = 0;
+        const power = Math.pow(10, nDigits);
+        let trimmed = "" + Math.round(number * power);
+        while (trimmed.length < nDigits + 1) {
+          trimmed = "0" + trimmed;
+        }
+        const len = trimmed.length;
+        return (
+          trimmed.substr(0, len - nDigits) +
+          "." +
+          trimmed.substr(len - nDigits, nDigits)
+        );
+      }
+
+      function getBrowser() {
+        // http://www.quirksmode.org/js/detect.html
+        let versionSearchString;
+        const dataBrowser = [
+          {
+            string: navigator.userAgent,
+            subString: "Chrome",
+            identity: "Chrome",
+          },
+          {
+            string: navigator.userAgent,
+            subString: "Safari",
+            identity: "Chrome",
+          },
+          {
+            string: navigator.userAgent,
+            subString: "Firefox",
+            identity: "Firefox",
+          },
+          {
+            string: navigator.userAgent,
+            subString: "MSIE",
+            identity: "IE",
+            versionSearch: "MSIE",
+          },
+        ];
+
+        function searchString(data) {
+          for (let i = 0; i < data.length; i++) {
+            const dataString = data[i].string;
+            const dataProp = data[i].prop;
+            if (dataString) {
+              if (dataString.indexOf(data[i].subString) != -1)
+                return data[i].identity;
+            } else if (dataProp) return data[i].identity;
+          }
+        }
+
+        return searchString(dataBrowser) || "An unknown browser";
+      }
+
+      function checkallsetPLL(case_) {
+        //checkmark for all of a PLL set
+        let temparr = algsGroups_PLL[case_.id];
+        console.log(case_.id);
+        let temp;
+        for (let i = 0; i < temparr.length; i++) {
+          temp = document.getElementById(temparr[i]);
+          if (case_.checked) {
+            if (!temp.checked) {
+              temp.checked = true;
+              addPLLAlg(temp);
+            }
+          } else if (!case_.checked) {
+            temp.checked = false;
+            addPLLAlg(temp);
+          }
+        }
+      }
+
+      function checkallsetOLL(case_) {
+        //checkmark for all of a OLL set
+        let temparr = algsGroups_OLL[case_.id];
+        //console.log(algsGroups_OLL[case_.id]);
+        let temp;
+        for (let i = 0; i < temparr.length; i++) {
+          temp = document.getElementById(temparr[i] + "_");
+          if (case_.checked) {
+            if (!temp.checked) {
+              temp.checked = true;
+              addOLLAlg(temp);
+            }
+          } else if (!case_.checked) {
+            temp.checked = false;
+            addOLLAlg(temp);
+          }
+        }
+      }
+
+      function addPLLAlg(name) {
+        if (name.checked) {
+          //console.log(name.id);
+          chosenAlgsPLL.push(name.id);
+        } else if (!name.checked) {
+          for (let i = 0; i < chosenAlgsPLL.length; i++) {
+            if (chosenAlgsPLL[i] === name.id) {
+              chosenAlgsPLL.splice(i, 1);
+            }
+          }
+        }
+        $("selcasePLL").innerHTML = "Case(s) Selected: " + chosenAlgsPLL.length;
+      }
+
+      function addOLLAlg(name) {
+        if (name.checked) {
+          chosenAlgsOLL.push(name.id.replace("_", ""));
+        } else if (!name.checked) {
+          for (let i = 0; i < chosenAlgsOLL.length; i++) {
+            if (chosenAlgsOLL[i] === name.id.replace("_", "")) {
+              chosenAlgsOLL.splice(i, 1);
+            }
+          }
+        }
+        $("selcaseOLL").innerHTML = "Case(s) Selected: " + chosenAlgsOLL.length;
+      }
+
+      function selectAlgSet() {
+        const obj = $("algset");
+        if (obj.selectedIndex === 0) {
+          document.getElementById("pll").style.display = "contents";
+          document.getElementById("oll").style.display = "none";
+          algType = "pll";
+        } else if (obj.selectedIndex === 1) {
+          document.getElementById("pll").style.display = "none";
+          document.getElementById("oll").style.display = "contents";
+          algType = "oll";
+        }
+      }
+
+      function selectAllpllAlgs(cb) {
+        const alphabet = [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F",
+          "G",
+          "H",
+          "I",
+          "J",
+          "K",
+          "L",
+          "M",
+          "N",
+          "P",
+          "Q",
+          "R",
+          "S",
+          "T",
+          "U",
+          "V",
+          "W",
+          "X",
+          "Y",
+          "Z",
+        ];
+        const temp = "Group ";
+        if (cb.checked) {
+          for (let i = 0; i < alphabet.length; i++) {
+            document.getElementById([temp + alphabet[i]]).checked = true;
+            checkallsetPLL(document.getElementById([temp + alphabet[i]]));
+          }
+        } else if (!cb.checked) {
+          for (let i = 0; i < alphabet.length; i++) {
+            document.getElementById([temp + alphabet[i]]).checked = false;
+            checkallsetPLL(document.getElementById([temp + alphabet[i]]));
+          }
+        }
+      }
+
+      function selectAllollAlgs(cb_) {
+        const temp = "Group ";
+        if (cb_.checked) {
+          for (let i = 1; i <= 37; i++) {
+            document.getElementById([temp + i]).checked = true;
+            checkallsetOLL(document.getElementById(temp + i));
+          }
+        } else if (!cb_.checked) {
+          for (let i = 1; i <= 37; i++) {
+            document.getElementById(temp + i).checked = false;
+            checkallsetOLL(document.getElementById(temp + i));
+          }
+        }
+      }
+
+      function assistance() {
+        //$("algassist").innerHTML = randomcase;
+        if (algType == "pll") {
+          $("algassist").innerHTML = algsInfo_PLL[randomcase]["a"];
+        } else if (algType == "oll") {
+          $("algassist").innerHTML = algsInfo_OLL[randomcase]["a"];
+        }
+      }
+
+      let checkboxes = document.getElementsByTagName("input");
+
+      for (let i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].type !== "checkbox") {
+          checkboxes.splice(i, 1);
+        }
+      }
+
+      function save() {
+        for (let i = 0; i < checkboxes.length; i++) {
+          localStorage.setItem(checkboxes[i].id, checkboxes[i].checked);
+        }
+
+        localStorage.setItem("pll_len", chosenAlgsPLL.length);
+        localStorage.setItem("oll_len", chosenAlgsOLL.length);
+      }
+
+      function load_() {
+        for (let i = 0; i < checkboxes.length; i++) {
+          checkboxes[i].checked =
+            localStorage.getItem(checkboxes[i].id) === "true" ? true : false;
+
+          if (
+            checkboxes[i].className === "pllbox" &&
+            checkboxes[i].checked === true
+          ) {
+            addPLLAlg(checkboxes[i]);
+          } else if (
+            checkboxes[i].className === "ollbox" &&
+            checkboxes[i].checked === true
+          ) {
+            addOLLAlg(checkboxes[i]);
+          }
+        }
+      }
+      window.addEventListener("change", save);
+
+      //
+    </script>
+  </head>
+  <body text="white" onload=" reset();changedColor();init();load_()">
+    <div class="options">
+      <table class="options">
+        <td class="options">
+          Color Scheme:
+          <select id="colors" onchange="changedColor()">
+            <option value="mf8" selected>mf8</option>
+            <option value="blacktop">blacktop</option>
+          </select>
+        </td>
+        <td class="options">
+          Alg Set
+          <select id="algset" style="width: 100px" onchange="selectAlgSet()">
+            <option value="pll">PLL</option>
+            <option value="oll">OLL</option>
+          </select>
+        </td>
+      </table>
+    </div>
+    <div class="container">
+      <div id="timer"><span id="time">Ready</span>&nbsp;</div>
+    </div>
+    <br />
+    <div height="1000" width="500" id="cube">
+      <canvas id="c" />
+    </div>
+
+    <!--
+      Table For Selection
+      -->
+    <div id="selectTable">
+      <!--
+      PLL Table
+      -->
+      <div id="pll">
+        <table>
+          <tr style="width: 20%">
+            <td class="larger text" id="selcasePLL" colspan="4">
+              Case(s) Selected: 0
+            </td>
+            <td>
+              <input
+                id="selectAllPLL"
+                type="checkbox"
+                onchange="selectAllpllAlgs(this)"
+                class="box"
+              /><label class="larger text" for="selectAllPLL">Select All</label>
+            </td>
+          </tr>
+          <!--
+        Group A
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group A"
+                    onchange="checkallsetPLL(this)"
+                  />A</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="1"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                  class="pllbox"
+                />
+                <label id="algs" for="1"
+                  ><img src="Alg_Images\PLL\2.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="2"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                  class="pllbox"
+                />
+                <label id="algs" for="2"
+                  ><img src="Alg_Images\PLL\2.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="3"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                  class="pllbox"
+                />
+                <label id="algs" for="3"
+                  ><img src="Alg_Images\PLL\3.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="4"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                  class="pllbox"
+                />
+                <label id="algs" for="4"
+                  ><img src="Alg_Images\PLL\4.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group B
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 110%; padding-bottom: 110%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group B"
+                    onchange="checkallsetPLL(this)"
+                  />B</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="5"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="5"
+                  ><img src="Alg_Images\PLL\5.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="6"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="6"
+                  ><img src="Alg_Images\PLL\6.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="7"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="7"
+                  ><img src="Alg_Images\PLL\7.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="8"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="8"
+                  ><img src="Alg_Images\PLL\8.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group C
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group C"
+                    onchange="checkallsetPLL(this)"
+                  />C</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="9"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="9"
+                  ><img src="Alg_Images\PLL\9.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="10"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="10"
+                  ><img src="Alg_Images\PLL\10.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="11"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="11"
+                  ><img src="Alg_Images\PLL\11.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="12"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="12"
+                  ><img src="Alg_Images\PLL\12.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="13"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="13"
+                  ><img src="Alg_Images\PLL\13.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="14"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="14"
+                  ><img src="Alg_Images\PLL\14.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="15"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="15"
+                  ><img src="Alg_Images\PLL\15.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="16"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="16"
+                  ><img src="Alg_Images\PLL\16.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="17"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="17"
+                  ><img src="Alg_Images\PLL\17.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="18"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="18"
+                  ><img src="Alg_Images\PLL\18.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="19"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="19"
+                  ><img src="Alg_Images\PLL\19.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="20"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="20"
+                  ><img src="Alg_Images\PLL\20.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group D
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group D"
+                    onchange="checkallsetPLL(this)"
+                  />D</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="21"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="21" style="text-align: center"
+                  ><img src="Alg_Images\PLL\21.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="22"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="22" style="text-align: center"
+                  ><img src="Alg_Images\PLL\22.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group E
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group E"
+                    onchange="checkallsetPLL(this)"
+                  />E</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="23"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="23"
+                  ><img src="Alg_Images\PLL\23.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="24"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="24"
+                  ><img src="Alg_Images\PLL\24.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="25"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="25"
+                  ><img src="Alg_Images\PLL\25.png"
+                /></label>
+              </td>
+              <td style="background-color: white"></td>
+            </tr>
+          </div>
+
+          <!--
+        Group F
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group F"
+                    onchange="checkallsetPLL(this)"
+                  />F</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="26"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="26"
+                  ><img src="Alg_Images\PLL\26.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="27"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="27"
+                  ><img src="Alg_Images\PLL\27.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="28"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="28"
+                  ><img src="Alg_Images\PLL\28.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="29"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="29"
+                  ><img src="Alg_Images\PLL\29.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="30"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="30"
+                  ><img src="Alg_Images\PLL\30.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="31"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="31"
+                  ><img src="Alg_Images\PLL\31.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="32"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="32"
+                  ><img src="Alg_Images\PLL\32.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="33"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="33"
+                  ><img src="Alg_Images\PLL\33.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="34"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="34" style="text-align: center"
+                  ><img src="Alg_Images\PLL\34.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="35"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="35" style="text-align: center"
+                  ><img src="Alg_Images\PLL\35.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group G
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group G"
+                    onchange="checkallsetPLL(this)"
+                  />G</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="36"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="36"
+                  ><img src="Alg_Images\PLL\36.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="37"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="37"
+                  ><img src="Alg_Images\PLL\37.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="38"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="38"
+                  ><img src="Alg_Images\PLL\38.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="39"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="39"
+                  ><img src="Alg_Images\PLL\39.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group H
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group H"
+                    onchange="checkallsetPLL(this)"
+                  />H</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="40"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="40"
+                  ><img src="Alg_Images\PLL\40.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="41"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="41"
+                  ><img src="Alg_Images\PLL\41.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="42"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="42"
+                  ><img src="Alg_Images\PLL\42.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="43"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="43"
+                  ><img src="Alg_Images\PLL\43.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group I
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group I"
+                    onchange="checkallsetPLL(this)"
+                  />I</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="44"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="44"
+                  ><img src="Alg_Images\PLL\44.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="45"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="45"
+                  ><img src="Alg_Images\PLL\45.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="46"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="46"
+                  ><img src="Alg_Images\PLL\46.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="47"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="47"
+                  ><img src="Alg_Images\PLL\47.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="48"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="48"
+                  ><img src="Alg_Images\PLL\48.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="49"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="49"
+                  ><img src="Alg_Images\PLL\49.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="50"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="50"
+                  ><img src="Alg_Images\PLL\50.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="51"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="51"
+                  ><img src="Alg_Images\PLL\51.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="52"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="52"
+                  ><img src="Alg_Images\PLL\52.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="53"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="53"
+                  ><img src="Alg_Images\PLL\53.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="54"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="54"
+                  ><img src="Alg_Images\PLL\54.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="55"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="55"
+                  ><img src="Alg_Images\PLL\55.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group J
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group J"
+                    onchange="checkallsetPLL(this)"
+                  />J</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="56"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="56"
+                  ><img src="Alg_Images\PLL\56.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="57"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="57"
+                  ><img src="Alg_Images\PLL\57.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="58"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="58"
+                  ><img src="Alg_Images\PLL\58.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="59"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="59"
+                  ><img src="Alg_Images\PLL\59.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="60"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="60" style="text-align: center"
+                  ><img src="Alg_Images\PLL\60.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="61"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="61" style="text-align: center"
+                  ><img src="Alg_Images\PLL\61.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group K
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group K"
+                    onchange="checkallsetPLL(this)"
+                  />K</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="62"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="62"
+                  ><img src="Alg_Images\PLL\62.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="63"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="63"
+                  ><img src="Alg_Images\PLL\63.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="64"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="64"
+                  ><img src="Alg_Images\PLL\64.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="65"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="65"
+                  ><img src="Alg_Images\PLL\65.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group L
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group L"
+                    onchange="checkallsetPLL(this)"
+                  />L</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="66"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="66"
+                  ><img src="Alg_Images\PLL\66.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="67"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="67"
+                  ><img src="Alg_Images\PLL\67.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="68"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="68"
+                  ><img src="Alg_Images\PLL\68.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="69"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="69"
+                  ><img src="Alg_Images\PLL\69.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="70"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="70"
+                  ><img src="Alg_Images\PLL\70.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="71"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="71"
+                  ><img src="Alg_Images\PLL\71.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="72"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="72"
+                  ><img src="Alg_Images\PLL\72.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="73"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="73"
+                  ><img src="Alg_Images\PLL\73.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="74"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="74" style="text-align: center"
+                  ><img src="Alg_Images\PLL\74.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="75"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="75" style="text-align: center"
+                  ><img src="Alg_Images\PLL\75.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group M
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group M"
+                    onchange="checkallsetPLL(this)"
+                  />M</label
+                >
+              </td>
+              <td colspan="4">
+                <input
+                  type="checkbox"
+                  id="76"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="76" style="text-align: center"
+                  ><img src="Alg_Images\PLL\76.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group N
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group N"
+                    onchange="checkallsetPLL(this)"
+                  />N</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="77"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="77"
+                  ><img src="Alg_Images\PLL\77.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="78"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="78"
+                  ><img src="Alg_Images\PLL\78.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="79"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="79"
+                  ><img src="Alg_Images\PLL\79.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="80"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="80"
+                  ><img src="Alg_Images\PLL\80.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group P
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group P"
+                    onchange="checkallsetPLL(this)"
+                  />P</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="82"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="82"
+                  ><img src="Alg_Images\PLL\82.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="83"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="83"
+                  ><img src="Alg_Images\PLL\83.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="84"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="84"
+                  ><img src="Alg_Images\PLL\84.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="85"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="85"
+                  ><img src="Alg_Images\PLL\85.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="86"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="86"
+                  ><img src="Alg_Images\PLL\86.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="87"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="87"
+                  ><img src="Alg_Images\PLL\87.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="88"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="88"
+                  ><img src="Alg_Images\PLL\88.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="89"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="89"
+                  ><img src="Alg_Images\PLL\89.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group Q
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group Q"
+                    onchange="checkallsetPLL(this)"
+                  />Q</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="90"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="90"
+                  ><img src="Alg_Images\PLL\90.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="91"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="91"
+                  ><img src="Alg_Images\PLL\91.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="92"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="92"
+                  ><img src="Alg_Images\PLL\92.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="93"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="93"
+                  ><img src="Alg_Images\PLL\93.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group R
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group R"
+                    onchange="checkallsetPLL(this)"
+                  />R</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="94"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="94"
+                  ><img src="Alg_Images\PLL\94.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="95"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="95"
+                  ><img src="Alg_Images\PLL\95.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="96"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="96"
+                  ><img src="Alg_Images\PLL\96.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="97"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="97"
+                  ><img src="Alg_Images\PLL\97.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="98"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="98"
+                  ><img src="Alg_Images\PLL\98.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="99"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="99"
+                  ><img src="Alg_Images\PLL\99.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="100"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="100"
+                  ><img src="Alg_Images\PLL\100.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="101"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="101"
+                  ><img src="Alg_Images\PLL\101.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group S
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group S"
+                    onchange="checkallsetPLL(this)"
+                  />S</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="102"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="102"
+                  ><img src="Alg_Images\PLL\102.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="103"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="103"
+                  ><img src="Alg_Images\PLL\103.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="104"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="104"
+                  ><img src="Alg_Images\PLL\104.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="105"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="105"
+                  ><img src="Alg_Images\PLL\105.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="106"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="106"
+                  ><img src="Alg_Images\PLL\106.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="107"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="107"
+                  ><img src="Alg_Images\PLL\107.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="108"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="108"
+                  ><img src="Alg_Images\PLL\108.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="109"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="109"
+                  ><img src="Alg_Images\PLL\109.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="110"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="110"
+                  ><img src="Alg_Images\PLL\110.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="111"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="111"
+                  ><img src="Alg_Images\PLL\111.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="112"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="112"
+                  ><img src="Alg_Images\PLL\112.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="113"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="113"
+                  ><img src="Alg_Images\PLL\113.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group T
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group T"
+                    onchange="checkallsetPLL(this)"
+                  />T</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="114"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="114"
+                  ><img src="Alg_Images\PLL\114.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="115"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="115"
+                  ><img src="Alg_Images\PLL\115.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="116"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="116"
+                  ><img src="Alg_Images\PLL\116.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="117"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="117"
+                  ><img src="Alg_Images\PLL\117.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="118"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="118"
+                  ><img src="Alg_Images\PLL\118.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="119"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="119"
+                  ><img src="Alg_Images\PLL\119.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="120"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="120"
+                  ><img src="Alg_Images\PLL\120.png"
+                /></label>
+              </td>
+              <td style="background-color: white"></td>
+            </tr>
+          </div>
+
+          <!--
+        Group U
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group U"
+                    onchange="checkallsetPLL(this)"
+                  />U</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="121"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="121"
+                  ><img src="Alg_Images\PLL\121.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="122"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="122"
+                  ><img src="Alg_Images\PLL\122.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="123"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="123"
+                  ><img src="Alg_Images\PLL\123.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="124"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="124"
+                  ><img src="Alg_Images\PLL\124.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group V
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group V"
+                    onchange="checkallsetPLL(this)"
+                  />V</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="125"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="125"
+                  ><img src="Alg_Images\PLL\125.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="126"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="126"
+                  ><img src="Alg_Images\PLL\126.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="127"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="127"
+                  ><img src="Alg_Images\PLL\127.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="128"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="128"
+                  ><img src="Alg_Images\PLL\128.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="129"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="129"
+                  ><img src="Alg_Images\PLL\129.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="130"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="130"
+                  ><img src="Alg_Images\PLL\130.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="131"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="131"
+                  ><img src="Alg_Images\PLL\131.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="132"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="132"
+                  ><img src="Alg_Images\PLL\132.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group W
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group W"
+                    onchange="checkallsetPLL(this)"
+                  />W</label
+                >
+              </td>
+              <td colspan="4">
+                <input
+                  type="checkbox"
+                  id="133"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="133" style="text-align: center"
+                  ><img src="Alg_Images\PLL\133.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group X
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group X"
+                    onchange="checkallsetPLL(this)"
+                  />X</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="134"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="134"
+                  ><img src="Alg_Images\PLL\134.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="135"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="135"
+                  ><img src="Alg_Images\PLL\135.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="136"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="136"
+                  ><img src="Alg_Images\PLL\136.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="137"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="137"
+                  ><img src="Alg_Images\PLL\137.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="138"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="138"
+                  ><img src="Alg_Images\PLL\138.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="139"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="139"
+                  ><img src="Alg_Images\PLL\139.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="140"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="140"
+                  ><img src="Alg_Images\PLL\140.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="141"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="141"
+                  ><img src="Alg_Images\PLL\141.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="142"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="142" style="text-align: center"
+                  ><img src="Alg_Images\PLL\142.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="143"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="143" style="text-align: center"
+                  ><img src="Alg_Images\PLL\143.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group Y
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group Y"
+                    onchange="checkallsetPLL(this)"
+                  />Y</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="144"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="144"
+                  ><img src="Alg_Images\PLL\144.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="145"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="145"
+                  ><img src="Alg_Images\PLL\145.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="146"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="146"
+                  ><img src="Alg_Images\PLL\146.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="147"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="147"
+                  ><img src="Alg_Images\PLL\147.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="148"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="148" style="text-align: center"
+                  ><img src="Alg_Images\PLL\148.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="149"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="149" style="text-align: center"
+                  ><img src="Alg_Images\PLL\149.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group Z
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group Z"
+                    onchange="checkallsetPLL(this)"
+                  />Z</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="150"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="150"
+                  ><img src="Alg_Images\PLL\23.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="151"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="151"
+                  ><img src="Alg_Images\PLL\151.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="152"
+                  onchange="addPLLAlg(this)"
+                  class="pllbox"
+                />
+                <label id="algs" for="152"
+                  ><img src="Alg_Images\PLL\152.png"
+                /></label>
+              </td>
+              <td style="background-color: white"></td>
+            </tr>
+          </div>
+        </table>
+      </div>
+      <!--
+      OLL Table
+      -->
+      <div id="oll" style="display: none">
+        <table>
+          <tr style="width: 20%">
+            <td class="larger text" id="selcaseOLL" colspan="4">
+              Case(s) Selected: 0
+            </td>
+            <td>
+              <input
+                id="selectAllOLL"
+                type="checkbox"
+                onchange="selectAllollAlgs(this)"
+              /><label class="larger text" for="selectAllOLL">Select All</label>
+            </td>
+          </tr>
+          <!--
+        Group 1
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 1"
+                    onchange="checkallsetOLL(this)"
+                  />1</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="1_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="1_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\1.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="2_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="2_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\2.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 2
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 2"
+                    onchange="checkallsetOLL(this)"
+                  />2</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="3_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="3_"
+                  ><img src="Alg_Images\OLL\3.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="4_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="4_"
+                  ><img src="Alg_Images\OLL\4.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="5_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="5_"
+                  ><img src="Alg_Images\OLL\5.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="6_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="6_"
+                  ><img src="Alg_Images\OLL\6.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 3
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 3"
+                    onchange="checkallsetOLL(this)"
+                  />3</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="7_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="7_"
+                  ><img src="Alg_Images\OLL\7.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="8_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="8_"
+                  ><img src="Alg_Images\OLL\8.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="9_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="9_"
+                  ><img src="Alg_Images\OLL\9.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="10_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="10_"
+                  ><img src="Alg_Images\OLL\10.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 4
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 4"
+                    onchange="checkallsetOLL(this)"
+                  />4</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="11_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="11_"
+                  ><img src="Alg_Images\OLL\11.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="12_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="12_"
+                  ><img src="Alg_Images\OLL\12.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="13_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="13_"
+                  ><img src="Alg_Images\OLL\13.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="14_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="14_"
+                  ><img src="Alg_Images\OLL\14.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="15_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="15_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\15.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="16_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="16_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\16.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 5
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 5"
+                    onchange="checkallsetOLL(this)"
+                  />5</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="17_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="17_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\17.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="18_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="18_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\18.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 6
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 6"
+                    onchange="checkallsetOLL(this)"
+                  />6</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="19_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="19_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\19.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="20_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="20_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\20.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 7
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 7"
+                    onchange="checkallsetOLL(this)"
+                  />7</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="21_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="21_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\21.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="22_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="22_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\22.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 8
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 8"
+                    onchange="checkallsetOLL(this)"
+                  />8</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="23_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="23_"
+                  ><img src="Alg_Images\OLL\23.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="24_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="24_"
+                  ><img src="Alg_Images\OLL\24.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="25_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="25_"
+                  ><img src="Alg_Images\OLL\25.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="26_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="26_"
+                  ><img src="Alg_Images\OLL\26.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 9
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 9"
+                    onchange="checkallsetOLL(this)"
+                  />9</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="27_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="27_"
+                  ><img src="Alg_Images\OLL\27.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="28_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="28_"
+                  ><img src="Alg_Images\OLL\28.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="29_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="29_"
+                  ><img src="Alg_Images\OLL\29.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="30_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="30_"
+                  ><img src="Alg_Images\OLL\30.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 10
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 10"
+                    onchange="checkallsetOLL(this)"
+                  />10</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="31_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="31_"
+                  ><img src="Alg_Images\OLL\31.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="32_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="32_"
+                  ><img src="Alg_Images\OLL\32.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="33_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="33_"
+                  ><img src="Alg_Images\OLL\33.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="34_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="34_"
+                  ><img src="Alg_Images\OLL\34.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 11
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 11"
+                    onchange="checkallsetOLL(this)"
+                  />11</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="35_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="35_"
+                  ><img src="Alg_Images\OLL\35.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="36_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="36_"
+                  ><img src="Alg_Images\OLL\36.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="37_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="37_"
+                  ><img src="Alg_Images\OLL\37.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="38_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="38_"
+                  ><img src="Alg_Images\OLL\38.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 12
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 12"
+                    onchange="checkallsetOLL(this)"
+                  />12</label
+                >
+              </td>
+              <td colspan="2=">
+                <input
+                  type="checkbox"
+                  id="39_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="39_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\39.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="40_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="40_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\40.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 13
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 13"
+                    onchange="checkallsetOLL(this)"
+                  />13</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="41_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="41_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\41.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="42_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="42_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\42.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 14
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 14"
+                    onchange="checkallsetOLL(this)"
+                  />14</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="43_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="43_"
+                  ><img src="Alg_Images\OLL\43.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="44_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="44_"
+                  ><img src="Alg_Images\OLL\44.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="45_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="45_"
+                  ><img src="Alg_Images\OLL\45.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="46_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="46_"
+                  ><img src="Alg_Images\OLL\46.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 15
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 15"
+                    onchange="checkallsetOLL(this)"
+                  />15</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="47_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="47_"
+                  ><img src="Alg_Images\OLL\47.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="48_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="48_"
+                  ><img src="Alg_Images\OLL\48.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="49_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="49_"
+                  ><img src="Alg_Images\OLL\49.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="50_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="50_"
+                  ><img src="Alg_Images\OLL\50.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 16
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 16"
+                    onchange="checkallsetOLL(this)"
+                  />16</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="51_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="51_"
+                  ><img src="Alg_Images\OLL\51.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="52_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="52_"
+                  ><img src="Alg_Images\OLL\52.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="53_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="53_"
+                  ><img src="Alg_Images\OLL\53.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="54_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="54_"
+                  ><img src="Alg_Images\OLL\54.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+
+          <!--
+        Group 17
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 17"
+                    onchange="checkallsetOLL(this)"
+                  />17</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="55_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="55_"
+                  ><img src="Alg_Images\OLL\51.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="56_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="56_"
+                  ><img src="Alg_Images\OLL\56.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="57_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="57_"
+                  ><img src="Alg_Images\OLL\57.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="58_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="58_"
+                  ><img src="Alg_Images\OLL\58.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 18
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 18"
+                    onchange="checkallsetOLL(this)"
+                  />18</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="59_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="59_"
+                  ><img src="Alg_Images\OLL\59.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="60_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="60_"
+                  ><img src="Alg_Images\OLL\60.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="61_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="61_"
+                  ><img src="Alg_Images\OLL\61.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="62_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="62_"
+                  ><img src="Alg_Images\OLL\62.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="63_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="63_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\63.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="64_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="64_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\64.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 19
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 19"
+                    onchange="checkallsetOLL(this)"
+                  />19</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="65_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="65_"
+                  ><img src="Alg_Images\OLL\65.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="66_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="66_"
+                  ><img src="Alg_Images\OLL\66.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="67_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="67_"
+                  ><img src="Alg_Images\OLL\67.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="68_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="68_"
+                  ><img src="Alg_Images\OLL\68.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="69_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="69_"
+                  ><img src="Alg_Images\OLL\69.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="70_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="70_"
+                  ><img src="Alg_Images\OLL\70.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="71_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="71_"
+                  ><img src="Alg_Images\OLL\71.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="72_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="72_"
+                  ><img src="Alg_Images\OLL\72.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="73_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="73_"
+                  ><img src="Alg_Images\OLL\73.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="74_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="74_"
+                  ><img src="Alg_Images\OLL\74.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="75_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="75_"
+                  ><img src="Alg_Images\OLL\75.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="76_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="76_"
+                  ><img src="Alg_Images\OLL\76.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 20
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 20"
+                    onchange="checkallsetOLL(this)"
+                  />20</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="77_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="77_"
+                  ><img src="Alg_Images\OLL\77.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="78_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="78_"
+                  ><img src="Alg_Images\OLL\78.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="79_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="79_"
+                  ><img src="Alg_Images\OLL\79.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="80_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="80_"
+                  ><img src="Alg_Images\OLL\80.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="81_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="81_"
+                  ><img src="Alg_Images\OLL\81.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="82_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="82_"
+                  ><img src="Alg_Images\OLL\82.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="83_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="83_"
+                  ><img src="Alg_Images\OLL\83.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="84_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="84_"
+                  ><img src="Alg_Images\OLL\84.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="85_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="85_"
+                  ><img src="Alg_Images\OLL\85.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="86_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="86_"
+                  ><img src="Alg_Images\OLL\86.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="87_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="87_"
+                  ><img src="Alg_Images\OLL\87.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="88_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="88_"
+                  ><img src="Alg_Images\OLL\88.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 21
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 21"
+                    onchange="checkallsetOLL(this)"
+                  />21</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="89_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="89_"
+                  ><img src="Alg_Images\OLL\89.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="90_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="90_"
+                  ><img src="Alg_Images\OLL\90.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="91_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="91_"
+                  ><img src="Alg_Images\OLL\91.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="92_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="92_"
+                  ><img src="Alg_Images\OLL\92.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="93_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="93_"
+                  ><img src="Alg_Images\OLL\93.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="94_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="94_"
+                  ><img src="Alg_Images\OLL\94.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="95_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="95_"
+                  ><img src="Alg_Images\OLL\95.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="96_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="96_"
+                  ><img src="Alg_Images\OLL\96.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="97_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="97_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\97.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="98_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="98_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\98.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 22
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 22"
+                    onchange="checkallsetOLL(this)"
+                  />22</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="99_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="99_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\99.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="100_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="100_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\100.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 23
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 23"
+                    onchange="checkallsetOLL(this)"
+                  />23</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="101_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="101_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\101.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="102_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="102_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\102.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 24
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 24"
+                    onchange="checkallsetOLL(this)"
+                  />24</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="103_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="103_"
+                  ><img src="Alg_Images\OLL\103.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="104_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="104_"
+                  ><img src="Alg_Images\OLL\104.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="105_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="105_"
+                  ><img src="Alg_Images\OLL\105.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="106_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="106_"
+                  ><img src="Alg_Images\OLL\106.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 25
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 25"
+                    onchange="checkallsetOLL(this)"
+                  />25</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="107_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="107_"
+                  ><img src="Alg_Images\OLL\107.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="108_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="108_"
+                  ><img src="Alg_Images\OLL\108.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="109_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="109_"
+                  ><img src="Alg_Images\OLL\109.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="110_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="110_"
+                  ><img src="Alg_Images\OLL\110.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 26
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 26"
+                    onchange="checkallsetOLL(this)"
+                  />26</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="111_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="111_"
+                  ><img src="Alg_Images\OLL\111.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="112_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="112_"
+                  ><img src="Alg_Images\OLL\112.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="113_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="113_"
+                  ><img src="Alg_Images\OLL\113.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="114_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="114_"
+                  ><img src="Alg_Images\OLL\114.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 27
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 27"
+                    onchange="checkallsetOLL(this)"
+                  />27</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="115_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="115_"
+                  ><img src="Alg_Images\OLL\115.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="116_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="116_"
+                  ><img src="Alg_Images\OLL\116.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="117_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="117_"
+                  ><img src="Alg_Images\OLL\117.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="118_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="118_"
+                  ><img src="Alg_Images\OLL\118.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 28
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 28"
+                    onchange="checkallsetOLL(this)"
+                  />28</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="119_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="119_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\119.png"
+                /></label>
+              </td>
+              <td colspan="120">
+                <input
+                  type="checkbox"
+                  id="120_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="120_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\2.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 29
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 29"
+                    onchange="checkallsetOLL(this)"
+                  />29</label
+                >
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="121_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="121_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\121.png"
+                /></label>
+              </td>
+              <td colspan="122">
+                <input
+                  type="checkbox"
+                  id="122_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="122_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\2.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 30
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 30"
+                    onchange="checkallsetOLL(this)"
+                  />30</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="123_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="123_"
+                  ><img src="Alg_Images\OLL\123.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="124_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="124_"
+                  ><img src="Alg_Images\OLL\124.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="125_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="125_"
+                  ><img src="Alg_Images\OLL\125.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="126_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="126_"
+                  ><img src="Alg_Images\OLL\126.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 31
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 31"
+                    onchange="checkallsetOLL(this)"
+                  />31</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="127_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="127_"
+                  ><img src="Alg_Images\OLL\127.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="128_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="128_"
+                  ><img src="Alg_Images\OLL\128.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="129_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="129_"
+                  ><img src="Alg_Images\OLL\129.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="130_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="130_"
+                  ><img src="Alg_Images\OLL\130.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 32
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 32"
+                    onchange="checkallsetOLL(this)"
+                  />32</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="131_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="131_"
+                  ><img src="Alg_Images\OLL\131.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="132_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="132_"
+                  ><img src="Alg_Images\OLL\132.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="133_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="133_"
+                  ><img src="Alg_Images\OLL\133.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="134_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="134_"
+                  ><img src="Alg_Images\OLL\134.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 33
+        -->
+          <div>
+            <tr>
+              <td id="case-name">
+                <label id="case-name-label">
+                  <input
+                    type="checkbox"
+                    id="Group 33"
+                    onchange="checkallsetOLL(this)"
+                  />33</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="135_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="135_"
+                  ><img src="Alg_Images\OLL\135.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="136_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="136_"
+                  ><img src="Alg_Images\OLL\136.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="137_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="137_"
+                  ><img src="Alg_Images\OLL\137.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="138_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="138_"
+                  ><img src="Alg_Images\OLL\138.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 34
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="2">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 269%; padding-bottom: 269%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 34"
+                    onchange="checkallsetOLL(this)"
+                  />34</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="139_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="139_"
+                  ><img src="Alg_Images\OLL\139.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="140_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="140_"
+                  ><img src="Alg_Images\OLL\140.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="141_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="141_"
+                  ><img src="Alg_Images\OLL\141.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="142_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="142_"
+                  ><img src="Alg_Images\OLL\142.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="143_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="143_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\143.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="144_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="144_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\144.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 35
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 35"
+                    onchange="checkallsetOLL(this)"
+                  />35</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="145_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="145_"
+                  ><img src="Alg_Images\OLL\145.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="146_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="146_"
+                  ><img src="Alg_Images\OLL\146.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="147_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="147_"
+                  ><img src="Alg_Images\OLL\147.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="148_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="148_"
+                  ><img src="Alg_Images\OLL\148.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="149_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="149_"
+                  ><img src="Alg_Images\OLL\149.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="150_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="150_"
+                  ><img src="Alg_Images\OLL\150.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="151_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="151_"
+                  ><img src="Alg_Images\OLL\151.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="152_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="152_"
+                  ><img src="Alg_Images\OLL\152.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="153_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="153_"
+                  ><img src="Alg_Images\OLL\153.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="154_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="154_"
+                  ><img src="Alg_Images\OLL\154.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="155_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="155_"
+                  ><img src="Alg_Images\OLL\155.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="156_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="156_"
+                  ><img src="Alg_Images\OLL\156.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 36
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 36"
+                    onchange="checkallsetOLL(this)"
+                  />36</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="157_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="157_"
+                  ><img src="Alg_Images\OLL\157.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="158_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="158_"
+                  ><img src="Alg_Images\OLL\158.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="159_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="159_"
+                  ><img src="Alg_Images\OLL\159.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="160_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="160_"
+                  ><img src="Alg_Images\OLL\160.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="161_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="161_"
+                  ><img src="Alg_Images\OLL\161.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="162_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="162_"
+                  ><img src="Alg_Images\OLL\162.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="163_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="163_"
+                  ><img src="Alg_Images\OLL\163.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="164_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="164_"
+                  ><img src="Alg_Images\OLL\164.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="165_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="165_"
+                  ><img src="Alg_Images\OLL\165.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="166_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="166_"
+                  ><img src="Alg_Images\OLL\166.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="167_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="167_"
+                  ><img src="Alg_Images\OLL\167.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="168_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="168_"
+                  ><img src="Alg_Images\OLL\168.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+          <!--
+        Group 37
+        -->
+          <div>
+            <tr>
+              <td id="case-name" rowspan="3">
+                <label
+                  id="case-name-label"
+                  style="padding-top: 429%; padding-bottom: 429%"
+                >
+                  <input
+                    type="checkbox"
+                    id="Group 37"
+                    onchange="checkallsetOLL(this)"
+                  />37</label
+                >
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="169_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="169_"
+                  ><img src="Alg_Images\OLL\169.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="170_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="170_"
+                  ><img src="Alg_Images\OLL\170.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="171_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="171_"
+                  ><img src="Alg_Images\OLL\171.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="172_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="172_"
+                  ><img src="Alg_Images\OLL\172.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  id="173_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="173_"
+                  ><img src="Alg_Images\OLL\173.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="174_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="174_"
+                  ><img src="Alg_Images\OLL\174.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="175_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="175_"
+                  ><img src="Alg_Images\OLL\175.png"
+                /></label>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  id="176_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="176_"
+                  ><img src="Alg_Images\OLL\176.png"
+                /></label>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="177_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="177_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\177.png"
+                /></label>
+              </td>
+              <td colspan="2">
+                <input
+                  type="checkbox"
+                  id="178_"
+                  onchange="addOLLAlg(this)"
+                  class="ollbox"
+                />
+                <label id="algs" for="178_" style="text-align: center"
+                  ><img src="Alg_Images\OLL\178.png"
+                /></label>
+              </td>
+            </tr>
+          </div>
+        </table>
+      </div>
+    </div>
+    <div class="container">
+      <div id="algassist"></div>
+    </div>
+    <br />
+  </body>
+</html>
